@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Time in Thai</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      transition: background 0.5s;
+      position: relative;
+      overflow: hidden;
+      flex-direction: column;
+    }
+    /* Background image with low opacity */
+    body::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: url("https://i.imgur.com/zYjNnWR.png") center/cover no-repeat;
+      opacity: 0.03; /* 3% opacity */
+      z-index: -1;
+    }
+    h1 {
+      margin-top: 20px;
+      margin-bottom: 20px;
+      top: 113px;
+      font-size: 48px;
+      font-weight: bold;
+      text-align: center;
+    }
+    .container {
+      display: flex;
+      gap: 40px;
+      align-items: center;
+    }
+    .clock {
+      width: 250px;
+      height: 250px;
+      border: 3px solid #333;
+      border-radius: 50%;
+      position: relative;
+      background: white;
+    }
+    .hand {
+      width: 4px;
+      height: 75px;
+      background: #333;
+      position: absolute;
+      top: 53px;
+      left: 50%;
+      transform-origin: bottom;
+      transform: rotate(0deg);
+      transition: transform 0.35s linear;
+    }
+    .number {
+      position: absolute;
+      width: 30px;
+      height: 30px;
+    font-size: 28px;
+      text-align: center;
+      line-height: 30px;
+      font-weight: bold;
+      user-select: none;
+    }
+    .board {
+      background: #fff;
+      border: 2px solid #333;
+      padding: 20px;
+      border-radius: 12px;
+      min-width: 200px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .time-en {
+      font-size: 24px;
+      font-weight: bold;
+    }
+    .time-thai {
+      font-size: 17px;
+      margin-top: 4px;
+      color: #555;
+    }
+    .buttons {
+      margin-top: 15px;
+    }
+    button {
+      font-size: 20px;
+      margin: 0 10px;
+      padding: 5px 10px;
+      cursor: pointer;
+    }
+    .controls {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      font-size: 130%; /* enlarged by 30% */
+      font-weight: bold;
+    }
+    .mode-box {
+      margin-top: 8px;
+      padding: 6px 12px;
+      border: 2px solid #333;
+      border-radius: 6px;
+      background: #eee;
+      text-align: center;
+      width: 80px;
+    }
+  </style>
+</head>
+<body>
+  <div class="controls">
+    <div>Mode:</div>
+    <div class="mode-box" id="modeBox">Day</div>
+  </div>
+
+  <h1>Time in Thai language</h1>
+
+  <div class="container">
+    <div class="clock" id="clock">
+      <div class="hand" id="hourHand"></div>
+    </div>
+
+    <div class="board">
+      <div class="time-en" id="timeEn">--:--</div>
+      <div class="time-thai" id="timeThai">---</div>
+      <div class="buttons">
+        <button id="decrease">⟲</button>
+        <button id="increase">⟳</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const hand = document.getElementById('hourHand');
+    const timeEn = document.getElementById('timeEn');
+    const timeThai = document.getElementById('timeThai');
+    const modeBox = document.getElementById('modeBox');
+
+    // draw numbers 1-12 around the clock
+    const clock = document.getElementById('clock');
+    for (let i = 1; i <= 12; i++) {
+      const num = document.createElement('div');
+      num.className = 'number';
+      num.textContent = i;
+      const angle = (i - 3) * 30 * Math.PI / 180;
+      const r = 100;
+      const x = 125 + r * Math.cos(angle) - 15;
+      const y = 125 + r * Math.sin(angle) - 15;
+      num.style.left = x + 'px';
+      num.style.top = y + 'px';
+      clock.appendChild(num);
+    }
+
+    const dayTimeline = [
+      {h:6, period:'AM'}, {h:7, period:'AM'}, {h:8, period:'AM'}, {h:9, period:'AM'}, {h:10, period:'AM'}, {h:11, period:'AM'},
+      {h:12, period:'PM'}, {h:1, period:'PM'}, {h:2, period:'PM'}, {h:3, period:'PM'}, {h:4, period:'PM'}, {h:5, period:'PM'}, {h:6, period:'PM'}
+    ];
+
+    const nightTimeline = [
+      {h:7, period:'PM'}, {h:8, period:'PM'}, {h:9, period:'PM'}, {h:10, period:'PM'}, {h:11, period:'PM'},
+      {h:12, period:'AM'}, {h:1, period:'AM'}, {h:2, period:'AM'}, {h:3, period:'AM'}, {h:4, period:'AM'}, {h:5, period:'AM'}
+    ];
+
+    let isNight = false;
+    let index = 0;
+    let rotation = (dayTimeline[0].h % 12) * 30;
+
+    function updateBackground() {
+      document.body.style.background = isNight ? '#add8e6' : '#ffd580';
+      modeBox.textContent = isNight ? 'Night' : 'Day';
+    }
+
+    function toThai(h, period, isNightFlag) {
+      const tones = {
+        1: 'Neung(1)', 2: 'Soang(5)', 3: 'Saam(5)', 4: 'See(2)', 5: 'Haa(3)',
+        6: 'Hok(2)', 7: 'Jed(2)', 8: 'Paed(2)', 9: 'Kao(3)', 10: 'Sip(2)',
+        11: 'Sip(1) Ed(2)', 12: 'Sip(1) Song(5)'
+      };
+      if (!isNightFlag) {
+        if (period === 'AM') {
+          if (h === 6) return `Hok(2) Moong(1) Chau(4)`;
+          if (h >= 7 && h <= 11) return `${tones[h]} Moong(1)`;
+        } else {
+          if (h === 12) return `Thiang(3)`;
+          if (h === 1) return `Baay(2) Moong(1)`;
+          if (h === 2 || h === 3) return `Baay(2) ${tones[h]} `;
+          if (h === 4 || h === 5) return `${tones[h]} Moong(1) Yen(1)`;
+          if (h === 6) return `Hok(2) Moong(1) Yen(1)`;
+        }
+      }
+      if (isNightFlag) {
+        if (period === 'PM') {
+          if (h >= 7 && h <= 11) return `${tones[h - 6]} Thum(3)`;
+        } else {
+          if (h === 12) return `Thiang(3) Khuen(1)`;
+          if (h >= 1 && h <= 5) return `Tii(1) ${tones[h]}`;
+        }
+      }
+      return '---';
+    }
+
+    function setDisplayFromEntry(entry) {
+      timeEn.textContent = `${entry.h}:00 ${entry.period}`;
+      timeThai.textContent = toThai(entry.h, entry.period, isNight);
+      hand.style.transform = `rotate(${rotation}deg)`;
+    }
+
+    function increase() {
+      rotation += 30;
+      const seq = isNight ? nightTimeline : dayTimeline;
+      index++;
+      if (index >= seq.length) {
+        isNight = !isNight;
+        index = 0;
+      }
+      updateBackground();
+      const curr = isNight ? nightTimeline[index] : dayTimeline[index];
+      setDisplayFromEntry(curr);
+    }
+
+    function decrease() {
+      rotation -= 30;
+      const seq = isNight ? nightTimeline : dayTimeline;
+      index--;
+      if (index < 0) {
+        isNight = !isNight;
+        const newSeq = isNight ? nightTimeline : dayTimeline;
+        index = newSeq.length - 1;
+      }
+      updateBackground();
+      const curr = isNight ? nightTimeline[index] : dayTimeline[index];
+      setDisplayFromEntry(curr);
+    }
+
+    document.getElementById('increase').addEventListener('click', increase);
+    document.getElementById('decrease').addEventListener('click', decrease);
+
+    updateBackground();
+    const start = dayTimeline[0];
+    rotation = (start.h % 12) * 30;
+    setDisplayFromEntry(start);
+  </script>
+</body>
+</html>
